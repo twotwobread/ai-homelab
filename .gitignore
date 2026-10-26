@@ -1,0 +1,15 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig
+kubeconfig.*
+.kube/
+
+# Local tooling and OS files
+.pi/npm/
+node_modules/
+.DS_Store
+Thumbs.db
