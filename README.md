@@ -2,64 +2,75 @@
 
 Kubernetes 기반 AI 워크로드의 리소스 관리, 스케줄링, 실행 생명주기 및 모델 서빙을 연구하고 구현하는 개인 프로젝트입니다.
 
-기술 설치 자체보다 **문제 정의 → 원인 분석 → 설계·구현 → 실험 → 정량적 검증 → 문서화**에 집중합니다. AI Infrastructure / Platform Engineering 역량을 재현 가능한 코드와 검증 결과로 보여주는 것을 목표로 합니다.
+AI Infrastructure / Platform Engineering 역량을 재현 가능한 코드와 검증 결과로 보여주는 것을 목표로 합니다. 이 저장소는 **프로젝트의 전체 구조와 흐름을 설명하고, 각 영역의 저장소로 안내하는 인덱스**입니다. 작업 계획과 진행 상황, 기술 상세 문서와 검증 결과는 각 담당 저장소에서 관리합니다.
+
+## 핵심 원칙
+
+- **문제 해결 중심** — 기술 설치 자체보다 문제 정의 → 원인 분석 → 설계·구현 → 실험 → 검증에 집중합니다.
+- **기존 기능 우선 활용** — Kubernetes·Volcano와 추론 엔진이 제공하는 기능을 불필요하게 재구현하지 않습니다. Custom Controller는 확인된 플랫폼 요구사항에 한해 개발합니다.
+- **재현 가능한 검증** — 환경·조건·절차와 한계를 기록하고, 실제 측정하지 않은 개선 수치는 사용하지 않습니다.
+- **개발과 운영 분리** — 개발 환경에서 변경을 검증하고, 운영 구성은 Git을 기준으로 추적합니다.
+
+## 전체 아키텍처
+
+아래는 목표 개념 아키텍처이며, 구현 완료 상태를 나타내지 않습니다. 구체적인 구성과 검증 근거는 각 담당 저장소에서 설명합니다.
+
+```text
+                  Git / CI / 배포 자동화
+                            |
+                            v
+                 Kubernetes AI Platform
+                            |
+              +-------------+-------------+
+              |                           |
+              v                           v
+     AIWorkload API / Controller  ModelService API / Controller
+              |                           |
+              +-------------+-------------+
+                            |
+                            v
+                      Kubernetes API
+                            |
+                            v
+               기본 스케줄러 / Volcano
+                            |
+                            v
+                  CPU / GPU Compute Nodes
+                            |
+              +-------------+-------------+
+              |                           |
+              v                           v
+        Batch / Training             Model Serving
+              |                           |
+              +-------------+-------------+
+                            |
+                            v
+                   관측 / 성능·안정성 검증
+```
+
+- **인프라**는 워크로드를 실행할 클러스터와 컴퓨팅 자원, 네트워크·스토리지 기반을 제공합니다.
+- **스케줄러**는 자원 요구사항과 정책에 따라 Pod 배치를 결정합니다. Gang Scheduling은 함께 실행되어야 하는 Pod들의 스케줄링을 조정하며, 모델 병렬화를 대신하지 않습니다.
+- **Controller**는 선언된 워크로드·서빙 구성을 Kubernetes 리소스로 구체화하고 상태와 생명주기를 관리합니다.
+- **실행 런타임**은 실제 작업과 추론을 수행합니다. 모델 실행과 병렬화는 해당 런타임의 책임입니다.
+- **관측 계층**은 실행 상태, 자원 사용, 지연시간과 오류를 측정하여 설계와 운영 개선의 근거를 제공합니다.
+
+## 워크로드 흐름
+
+1. 사용자가 워크로드 또는 모델 서빙의 요구사항을 선언합니다.
+2. Controller가 선언된 상태에 맞춰 Job·Deployment 등 필요한 리소스를 관리합니다.
+3. 스케줄러가 자원과 정책을 평가하여 Pod를 노드에 배치합니다.
+4. 노드의 런타임이 작업을 수행하거나 추론 요청을 처리합니다.
+5. Controller가 상태를 동기화하고, 관측 데이터로 성능과 안정성을 검증합니다.
+
+이는 플랫폼의 논리적 흐름입니다. 모든 워크로드가 Volcano를 사용하거나 동일한 추론 엔진으로 실행되어야 한다는 의미는 아닙니다.
 
 ## 저장소 안내
 
-이 저장소는 전체 프로젝트를 소개하는 인덱스입니다. 기술 상세 문서와 검증 결과는 담당 저장소에서 관리하며, 별도 위키는 두지 않습니다.
+| 저장소 | 책임 |
+| --- | --- |
+| [ai-homelab](https://github.com/twotwobread/ai-homelab) | 전체 프로젝트 소개, 아키텍처와 흐름, 관련 저장소 안내 |
+| [homelab-infra](https://github.com/twotwobread/homelab-infra) | K3s 운영 구성과 배포·점검·복구 절차 |
 
-| 저장소 | 책임 | 상태 |
-| --- | --- | --- |
-| [ai-homelab](https://github.com/twotwobread/ai-homelab) | 전체 소개, 로드맵, 저장소·성과 안내 | 초기 구성 |
-| [homelab-infra](https://github.com/twotwobread/homelab-infra) | K3s 운영 설정, 배포·점검·복구 절차 | 초기 구성 |
-| `scheduling-lab` | Kubernetes / Volcano 스케줄링 실험 | 생성 예정 |
-| `ai-serving-operator` | CRD·Controller 및 모델 서빙 자동화 | 생성 예정 |
+스케줄링 실험은 `scheduling-lab`, CRD·Controller 및 모델 서빙 자동화는 `ai-serving-operator`로 책임을 분리하는 방향입니다. 해당 저장소가 생성되면 링크를 추가합니다.
 
-기존 `llm-serving-lab`은 별도 프로젝트로 보존하며, 기존 위키를 이 프로젝트의 근거로 자동 승계하지 않습니다.
-
-## 환경과 제약
-
-사용자가 제공한 기존 확인 사항 기준이며, 이 저장소 초기화 시 실시간 검증한 상태는 아닙니다.
-
-- 운영: Intel N100 / RAM 16GB Mini PC의 Ubuntu + 단일 서버 K3s. HA 구성은 아닙니다.
-- 개발: Windows + WSL. 개발용 kind는 필요할 때 구성합니다.
-- GPU: Intel 내장 GPU의 호스트 OpenVINO 인식·연산 실험 경험이 있습니다. Kubernetes GPU 할당은 미검증입니다.
-- 확장 후보: Raspberry Pi 4 ARM Worker. 참여 전 OS·메모리·네트워크 확인이 필요합니다.
-- 비용: 보유 CPU·Intel GPU를 우선 활용합니다. CUDA가 필요하면 승인된 범위에서 시간제 클라우드 GPU를 검토합니다.
-
-## 목표 아키텍처
-
-아래는 구현 완료 상태가 아닌 단계적 확장 방향입니다.
-
-```text
-Git / CI / 배포 자동화
-        ↓
-Kubernetes AI Platform
-        ├── AIWorkload API / Controller
-        └── ModelService API / Controller
-        ↓
-Kubernetes 기본 스케줄러 / Volcano
-        ↓
-CPU / Intel GPU / 필요시 클라우드 GPU
-        ↓
-Batch 실행 / 모델 서빙 / 관측·성능 검증
-```
-
-기존 Kubernetes·Volcano 기능을 우선 활용합니다. Custom Controller는 확인된 플랫폼 요구사항에 한해 개발하며, 추론 엔진과 스케줄러 알고리즘을 불필요하게 재구현하지 않습니다.
-
-## 로드맵
-
-1. **운영 기반 확인** — WSL에서 K3s API 접근, 노드·시스템 구성요소·네트워크·스토리지 확인 및 구성 코드화
-2. **기본 스케줄링 실험** — 개발용 kind에서 Requests / Limits, Affinity, Priority / Preemption 검증
-3. **Volcano 실험** — CPU 자원으로 Gang Scheduling, Queue, 자원 경합 비교
-4. **문제 분석과 기여** — 재현 가능한 upstream 문제를 찾으면 수정·테스트·PR 검토
-5. **플랫폼 개발** — 요구사항에 근거한 AIWorkload / ModelService API와 Controller 구현
-6. **서빙·최적화** — CPU / OpenVINO부터 시작하여 필요시 vLLM / SGLang 확장
-
-관측과 검증은 마지막 단계에만 수행하지 않고 각 단계에 포함합니다. Operator 및 클라우드 연동의 상세 설계는 아직 확정하지 않았습니다.
-
-## 현재 상태와 다음 작업
-
-현재는 저장소 골격을 준비하는 단계입니다. 다음 작업은 `homelab-infra`에서 원격 관리와 K3s 기본 상태를 확인하는 것입니다. 이 저장소 생성으로 클러스터 설정이 변경되지는 않습니다.
-
-아직 이 프로젝트에서 새로 검증한 실험 성과는 없습니다. 성과를 소개할 때에는 담당 저장소의 재현 절차, 실행 환경, 결과 및 한계에 연결하고 측정하지 않은 개선 수치는 작성하지 않습니다.
+이 인덱스에는 별도 위키를 두지 않습니다. 상세 지식은 각 담당 저장소를 기준으로 하며, 동일한 내용을 이곳에 복제하지 않습니다.
